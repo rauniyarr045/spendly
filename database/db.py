@@ -58,6 +58,74 @@ def init_db():
         conn.close()
 
 
+def get_user_by_id(user_id):
+    conn = get_db()
+    try:
+        return conn.execute(
+            "SELECT name, email, created_at FROM users WHERE id = ?", (user_id,)
+        ).fetchone()
+    finally:
+        conn.close()
+
+
+def get_summary_stats(user_id):
+    conn = get_db()
+    try:
+        total, count = conn.execute(
+            "SELECT COALESCE(SUM(amount), 0), COUNT(*) FROM expenses "
+            "WHERE user_id = ?",
+            (user_id,),
+        ).fetchone()
+        top = conn.execute(
+            "SELECT category FROM expenses WHERE user_id = ? "
+            "GROUP BY category ORDER BY SUM(amount) DESC LIMIT 1",
+            (user_id,),
+        ).fetchone()
+    finally:
+        conn.close()
+    return {
+        "total_spent": total,
+        "transaction_count": count,
+        "top_category": top["category"] if top else None,
+    }
+
+
+def get_recent_transactions(user_id, limit=10):
+    conn = get_db()
+    try:
+        rows = conn.execute(
+            "SELECT date, description, category, amount FROM expenses "
+            "WHERE user_id = ? ORDER BY date DESC, id DESC LIMIT ?",
+            (user_id, limit),
+        ).fetchall()
+    finally:
+        conn.close()
+    return [dict(r) for r in rows]
+
+
+def get_category_breakdown(user_id):
+    conn = get_db()
+    try:
+        rows = conn.execute(
+            "SELECT category, SUM(amount) AS amount FROM expenses "
+            "WHERE user_id = ? GROUP BY category ORDER BY amount DESC",
+            (user_id,),
+        ).fetchall()
+    finally:
+        conn.close()
+    total = sum(r["amount"] for r in rows)
+    if not total:
+        return []
+    return [
+        {
+            "name": r["category"],
+            "amount": r["amount"],
+            "percent": round(r["amount"] / total * 100),
+        }
+        for r in rows
+    ]
+
+
 def seed_db():
     conn = get_db()
     try:
