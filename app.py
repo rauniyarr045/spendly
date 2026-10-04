@@ -1,10 +1,19 @@
 import os
 import sqlite3
+from datetime import datetime
 
 from flask import Flask, redirect, render_template, request, session, url_for
 from werkzeug.security import check_password_hash, generate_password_hash
 
-from database.db import get_db, init_db, seed_db
+from database.db import (
+    get_category_breakdown,
+    get_db,
+    get_recent_transactions,
+    get_summary_stats,
+    get_user_by_id,
+    init_db,
+    seed_db,
+)
 
 app = Flask(__name__)
 # The fallback key is for local development only; set SECRET_KEY in production.
@@ -32,6 +41,17 @@ def _valid_email(email):
     local, domain = email.split("@")
     return bool(local) and "." in domain and not domain.startswith(".") \
         and not domain.endswith(".")
+
+
+def _initials(name):
+    return "".join(w[0] for w in name.split()[:2]).upper() or "?"
+
+
+def _member_since(created_at):
+    try:
+        return datetime.strptime(created_at, "%Y-%m-%d %H:%M:%S").strftime("%B %Y")
+    except (TypeError, ValueError):
+        return "—"
 
 
 @app.route("/register", methods=["GET", "POST"])
@@ -127,49 +147,27 @@ def logout():
 
 @app.route("/profile")
 def profile():
-    if not session.get("user_id"):
+    user_id = session.get("user_id")
+    if not user_id:
         return redirect(url_for("login"))
 
-    # Hardcoded sample data — replaced by real DB queries in Step 5.
+    row = get_user_by_id(user_id)
+    if row is None:
+        session.clear()
+        return redirect(url_for("login"))
+
     user = {
-        "name": "Demo User",
-        "email": "demo@spendly.com",
-        "initials": "DU",
-        "member_since": "October 2026",
+        "name": row["name"],
+        "email": row["email"],
+        "initials": _initials(row["name"]),
+        "member_since": _member_since(row["created_at"]),
     }
-    stats = {
-        "total_spent": 306.14,
-        "transaction_count": 6,
-        "top_category": "Bills",
-    }
-    transactions = [
-        {"date": "2026-10-22", "description": "Groceries",
-         "category": "Food", "amount": 27.40},
-        {"date": "2026-10-18", "description": "Pharmacy",
-         "category": "Health", "amount": 30.75},
-        {"date": "2026-10-14", "description": "New headphones",
-         "category": "Shopping", "amount": 64.99},
-        {"date": "2026-10-11", "description": "Movie ticket",
-         "category": "Entertainment", "amount": 18.00},
-        {"date": "2026-10-05", "description": "Electricity bill",
-         "category": "Bills", "amount": 120.00},
-        {"date": "2026-10-03", "description": "Monthly bus pass top-up",
-         "category": "Transport", "amount": 45.00},
-    ]
-    categories = [
-        {"name": "Bills", "amount": 120.00, "percent": 39},
-        {"name": "Shopping", "amount": 64.99, "percent": 21},
-        {"name": "Transport", "amount": 45.00, "percent": 15},
-        {"name": "Health", "amount": 30.75, "percent": 10},
-        {"name": "Food", "amount": 27.40, "percent": 9},
-        {"name": "Entertainment", "amount": 18.00, "percent": 6},
-    ]
     return render_template(
         "profile.html",
         user=user,
-        stats=stats,
-        transactions=transactions,
-        categories=categories,
+        stats=get_summary_stats(user_id),
+        transactions=get_recent_transactions(user_id),
+        categories=get_category_breakdown(user_id),
     )
 
 
