@@ -21,6 +21,8 @@ with app.app_context():
 
 @app.route("/")
 def landing():
+    if session.get("user_id"):
+        return redirect(url_for("profile"))
     return render_template("landing.html")
 
 
@@ -34,6 +36,8 @@ def _valid_email(email):
 
 @app.route("/register", methods=["GET", "POST"])
 def register():
+    if session.get("user_id"):
+        return redirect(url_for("profile"))
     if request.method == "GET":
         return render_template("register.html")
 
@@ -87,7 +91,7 @@ def login():
     conn = get_db()
     try:
         user = conn.execute(
-            "SELECT id, password_hash FROM users WHERE email = ?", (email,)
+            "SELECT id, name, password_hash FROM users WHERE email = ?", (email,)
         ).fetchone()
     finally:
         conn.close()
@@ -97,6 +101,7 @@ def login():
 
     session.clear()
     session["user_id"] = user["id"]
+    session["user_name"] = user["name"]
     return redirect(url_for("profile"))
 
 
@@ -122,7 +127,50 @@ def logout():
 
 @app.route("/profile")
 def profile():
-    return "Profile page — coming in Step 4"
+    if not session.get("user_id"):
+        return redirect(url_for("login"))
+
+    # Hardcoded sample data — replaced by real DB queries in Step 5.
+    user = {
+        "name": "Demo User",
+        "email": "demo@spendly.com",
+        "initials": "DU",
+        "member_since": "October 2026",
+    }
+    stats = {
+        "total_spent": 306.14,
+        "transaction_count": 6,
+        "top_category": "Bills",
+    }
+    transactions = [
+        {"date": "2026-10-22", "description": "Groceries",
+         "category": "Food", "amount": 27.40},
+        {"date": "2026-10-18", "description": "Pharmacy",
+         "category": "Health", "amount": 30.75},
+        {"date": "2026-10-14", "description": "New headphones",
+         "category": "Shopping", "amount": 64.99},
+        {"date": "2026-10-11", "description": "Movie ticket",
+         "category": "Entertainment", "amount": 18.00},
+        {"date": "2026-10-05", "description": "Electricity bill",
+         "category": "Bills", "amount": 120.00},
+        {"date": "2026-10-03", "description": "Monthly bus pass top-up",
+         "category": "Transport", "amount": 45.00},
+    ]
+    categories = [
+        {"name": "Bills", "amount": 120.00, "percent": 39},
+        {"name": "Shopping", "amount": 64.99, "percent": 21},
+        {"name": "Transport", "amount": 45.00, "percent": 15},
+        {"name": "Health", "amount": 30.75, "percent": 10},
+        {"name": "Food", "amount": 27.40, "percent": 9},
+        {"name": "Entertainment", "amount": 18.00, "percent": 6},
+    ]
+    return render_template(
+        "profile.html",
+        user=user,
+        stats=stats,
+        transactions=transactions,
+        categories=categories,
+    )
 
 
 @app.route("/expenses/add")

@@ -83,7 +83,7 @@ def test_login_page_redirects_when_logged_in(client, user):
 def test_navbar_reflects_auth_state(client, user):
     assert b"Sign in" in client.get("/").data
     _login(client)
-    page = client.get("/").data
+    page = client.get("/profile").data
     assert b"Sign out" in page
     assert b"Get started" not in page
 
