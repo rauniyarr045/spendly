@@ -158,6 +158,93 @@ def test_navbar_shows_username_and_sign_out(logged_in):
     assert b"Sign out" in page
 
 
+# Date filter (Step 6) ------------------------------------------------------
+
+
+@pytest.fixture
+def jane_with_expenses(logged_in):
+    _add_expense(EMAIL, 10.0, "Food", "2026-01-05", "jan-lunch")
+    _add_expense(EMAIL, 100.0, "Bills", "2026-02-01", "feb-rent")
+    _add_expense(EMAIL, 20.0, "Food", "2026-02-15", "feb-dinner")
+    _add_expense(EMAIL, 5.0, "Other", "2026-03-31", "mar-misc")
+    return logged_in
+
+
+def test_filter_form_is_shown(logged_in):
+    page = logged_in.get("/profile").data.decode()
+    assert 'name="from"' in page
+    assert 'name="to"' in page
+    assert "Clear" in page
+
+
+def test_no_filter_shows_everything(jane_with_expenses):
+    page = jane_with_expenses.get("/profile").data.decode()
+    assert "₹135.00" in page
+    assert "Recent transactions" in page
+
+
+def test_filter_from_only(jane_with_expenses):
+    page = jane_with_expenses.get("/profile?from=2026-02-15").data.decode()
+    assert "feb-dinner" in page and "mar-misc" in page
+    assert "jan-lunch" not in page and "feb-rent" not in page
+    assert "₹25.00" in page
+
+
+def test_filter_to_only(jane_with_expenses):
+    page = jane_with_expenses.get("/profile?to=2026-02-01").data.decode()
+    assert "jan-lunch" in page and "feb-rent" in page
+    assert "feb-dinner" not in page
+    assert "₹110.00" in page
+
+
+def test_filter_range_is_inclusive_and_updates_all_sections(jane_with_expenses):
+    page = jane_with_expenses.get(
+        "/profile?from=2026-02-01&to=2026-02-15"
+    ).data.decode()
+    assert "feb-rent" in page and "feb-dinner" in page
+    assert "jan-lunch" not in page and "mar-misc" not in page
+    assert "₹120.00" in page
+    assert '<p class="profile-stat-value">2</p>' in page
+    assert '<p class="profile-stat-value">Bills</p>' in page
+    names = re.findall(r'profile-breakdown-name">(\w+)<', page)
+    assert names == ["Bills", "Food"]
+    assert 'value="83"' in page  # Bills share of the filtered total
+    assert 'value="2026-02-01"' in page and 'value="2026-02-15"' in page
+    assert "Recent transactions" not in page
+
+
+def test_filter_with_no_matches_shows_empty_states(jane_with_expenses):
+    page = jane_with_expenses.get(
+        "/profile?from=2025-01-01&to=2025-12-31"
+    ).data.decode()
+    assert "₹0.00" in page
+    assert '<p class="profile-stat-value">—</p>' in page
+    assert "No transactions yet." in page
+    assert "No spending yet." in page
+
+
+@pytest.mark.parametrize(
+    "query", ["from=abc", "to=2026-13-01", "from=2026-03-01&to=2026-01-01"]
+)
+def test_invalid_filter_shows_error_and_unfiltered_data(
+    jane_with_expenses, query
+):
+    resp = jane_with_expenses.get(f"/profile?{query}")
+    page = resp.data.decode()
+    assert resp.status_code == 200
+    assert "auth-error" in page
+    assert "₹135.00" in page
+
+
+def test_filter_never_shows_other_users_expenses(jane_with_expenses):
+    seed_db()
+    page = jane_with_expenses.get(
+        "/profile?from=2000-01-01&to=2099-12-31"
+    ).data.decode()
+    assert "Groceries" not in page
+    assert "₹135.00" in page
+
+
 def test_template_has_no_inline_styles_or_hex_colours():
     path = os.path.join(
         os.path.dirname(__file__), "..", "templates", "profile.html"

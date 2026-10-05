@@ -47,6 +47,14 @@ def _initials(name):
     return "".join(w[0] for w in name.split()[:2]).upper() or "?"
 
 
+def _parse_date(value):
+    """Return an ISO date string, None for an empty value, or raise ValueError."""
+    value = (value or "").strip()
+    if not value:
+        return None
+    return datetime.strptime(value, "%Y-%m-%d").date().isoformat()
+
+
 def _member_since(created_at):
     try:
         return datetime.strptime(created_at, "%Y-%m-%d %H:%M:%S").strftime("%B %Y")
@@ -162,12 +170,29 @@ def profile():
         "initials": _initials(row["name"]),
         "member_since": _member_since(row["created_at"]),
     }
+
+    filter_error = None
+    try:
+        date_from = _parse_date(request.args.get("from"))
+        date_to = _parse_date(request.args.get("to"))
+    except ValueError:
+        date_from = date_to = None
+        filter_error = "Please enter valid dates (YYYY-MM-DD)."
+    if date_from and date_to and date_from > date_to:
+        date_from = date_to = None
+        filter_error = "The start date must be on or before the end date."
+
     return render_template(
         "profile.html",
         user=user,
-        stats=get_summary_stats(user_id),
-        transactions=get_recent_transactions(user_id),
-        categories=get_category_breakdown(user_id),
+        stats=get_summary_stats(user_id, date_from, date_to),
+        transactions=get_recent_transactions(
+            user_id, date_from=date_from, date_to=date_to
+        ),
+        categories=get_category_breakdown(user_id, date_from, date_to),
+        date_from=date_from,
+        date_to=date_to,
+        filter_error=filter_error,
     )
 
 
