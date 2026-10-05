@@ -20,6 +20,24 @@
             </div>
         </div>
 
+        <form class="profile-card profile-filter" method="get" action="{{ url_for('profile') }}">
+            {% if filter_error %}
+            <div class="auth-error profile-filter-error">{{ filter_error }}</div>
+            {% endif %}
+            <div class="profile-filter-field">
+                <label for="from">From</label>
+                <input class="form-input" type="date" id="from" name="from" value="{{ date_from or '' }}">
+            </div>
+            <div class="profile-filter-field">
+                <label for="to">To</label>
+                <input class="form-input" type="date" id="to" name="to" value="{{ date_to or '' }}">
+            </div>
+            <div class="profile-filter-actions">
+                <button type="submit" class="btn-primary">Apply</button>
+                <a href="{{ url_for('profile') }}" class="btn-ghost">Clear</a>
+            </div>
+        </form>
+
         <div class="profile-stats">
             <div class="profile-card">
                 <p class="profile-stat-label">Total spent</p>
@@ -53,7 +71,7 @@
         </div>
 
         <div class="profile-card">
-            <h2 class="profile-section-title">Recent transactions</h2>
+            <h2 class="profile-section-title">{{ "Transactions" if date_from or date_to else "Recent transactions" }}</h2>
             {% if transactions %}
             <div class="profile-table-wrap">
                 <table class="profile-table">
