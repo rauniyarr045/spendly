@@ -1,0 +1,15 @@
+/* ------------------------------------------------------------------ */
+/* Expense form                                                        */
+/* ------------------------------------------------------------------ */
+
+select.form-input {
+    cursor: pointer;
+    background: var(--paper-card);
+}
+
+.expense-optional {
+    font-weight: 400;
+    text-transform: none;
+    letter-spacing: 0;
+    color: var(--ink-faint);
+}

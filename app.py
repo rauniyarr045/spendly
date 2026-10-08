@@ -1,11 +1,14 @@
+import math
 import os
 import sqlite3
-from datetime import datetime
+from datetime import date, datetime
 
 from flask import Flask, redirect, render_template, request, session, url_for
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from database.db import (
+    CATEGORIES,
+    create_expense,
     get_category_breakdown,
     get_db,
     get_recent_transactions,
@@ -196,9 +199,64 @@ def profile():
     )
 
 
-@app.route("/expenses/add")
+MAX_DESCRIPTION_LENGTH = 200
+
+
+@app.route("/expenses/add", methods=["GET", "POST"])
 def add_expense():
-    return "Add expense — coming in Step 7"
+    user_id = session.get("user_id")
+    if not user_id:
+        return redirect(url_for("login"))
+
+    if request.method == "GET":
+        return render_template(
+            "add_expense.html",
+            categories=CATEGORIES,
+            form={"date": date.today().isoformat()},
+        )
+
+    form = {
+        "amount": request.form.get("amount", "").strip(),
+        "category": request.form.get("category", ""),
+        "date": request.form.get("date", "").strip(),
+        "description": request.form.get("description", "").strip(),
+    }
+
+    def fail(message):
+        return render_template(
+            "add_expense.html", categories=CATEGORIES, form=form, error=message
+        ), 400
+
+    try:
+        amount = float(form["amount"])
+    except ValueError:
+        return fail("Please enter a valid amount.")
+    if not math.isfinite(amount) or amount <= 0:
+        return fail("Amount must be greater than 0.")
+    amount = round(amount, 2)
+    if amount <= 0:
+        return fail("Amount must be greater than 0.")
+
+    if form["category"] not in CATEGORIES:
+        return fail("Please choose a valid category.")
+
+    try:
+        expense_date = _parse_date(form["date"])
+    except ValueError:
+        expense_date = None
+    if expense_date is None:
+        return fail("Please enter a valid date (YYYY-MM-DD).")
+
+    if len(form["description"]) > MAX_DESCRIPTION_LENGTH:
+        return fail(
+            f"Description must be at most {MAX_DESCRIPTION_LENGTH} characters."
+        )
+
+    create_expense(
+        user_id, amount, form["category"], expense_date,
+        form["description"] or None,
+    )
+    return redirect(url_for("profile"))
 
 
 @app.route("/expenses/<int:id>/edit")

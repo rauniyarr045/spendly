@@ -68,6 +68,11 @@
     color: var(--ink-faint);
 }
 
+.profile-add {
+    margin-left: auto;
+    white-space: nowrap;
+}
+
 /* Date filter -------------------------------------------------------- */
 
 .profile-filter {
@@ -258,5 +263,6 @@
     .profile-page { padding: 2rem 1rem 3rem; }
     .profile-card { padding: 1.25rem; }
     .profile-user { flex-direction: column; text-align: center; }
+    .profile-add { margin-left: 0; }
     .profile-breakdown-row { grid-template-columns: 90px 1fr 70px; gap: 0.75rem; }
 }
